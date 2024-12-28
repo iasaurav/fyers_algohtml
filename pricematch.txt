@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiple Stock Orders</title>
+    <style>
+        #results {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+    <script>
+        async function fetchAndPlaceOrders() {
+            
+            const accessToken = 'NKSZ6X7T3S-100:eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJhcGkuZnllcnMuaW4iLCJpYXQiOjE3MzUzNjk0MTMsImV4cCI6MTczNTQzMjIzMywibmJmIjoxNzM1MzY5NDEzLCJhdWQiOlsieDowIiwieDoxIiwieDoyIiwiZDoxIiwiZDoyIiwieDoxIiwieDowIl0sInN1YiI6ImFjY2Vzc190b2tlbiIsImF0X2hhc2giOiJnQUFBQUFCbmI2TEZqaGVDcXBVa0Q4V3JUcFBhNmp4ZTRZRjVacGxNZ21YM0NFZEhfLVQ4T0ZXdVVJaElGSUxxU2c0Y0x0SGtDQlZ6T0xJQTFCMEtkUngtOE9EbmQ5YjRKZnRsMjMtZzd1M1I2aEotOEtucHFiRT0iLCJkaXNwbGF5X25hbWUiOiJTQVVSQVYgS1VNQVIiLCJvbXMiOiJLMSIsImhzbV9rZXkiOiJjNDYyYWIwMmUzYTUxMjE0NzdkZjM4NjRlNTk5NTFhMmJlMzM0MTY1MzAxYjBlZGU4YWUxN2Y5MCIsImZ5X2lkIjoiWFM4ODM2OCIsImFwcFR5cGUiOjEwMCwicG9hX2ZsYWciOiJOIn0.SaBayw1HkY8NHln4k2EYOYzXPJK3bV3Ndzppn9sXPf8'; // Replace with your access_token
+
+            // Array of orders with different symbols, sides, and limit prices
+            const orders = [
+                {
+                    symbol: 'NSE:SBIN-EQ',
+                    side: 1, // 1 for buy, 2 for sell
+                    limitPrice: 300, // Example limit price for buy
+                    qty: 1
+                },
+                {
+                    symbol: 'NSE:TCS-EQ',
+                    side: 1, // 2 for sell
+                    limitPrice: 4164.85, // Example limit price for sell
+                    qty: 1
+                },
+                {
+                    symbol: 'NSE:INFY-EQ',
+                    side: 1, // 1 for buy
+                    limitPrice: 1450, // Example limit price for buy
+                    qty: 2
+                }
+            ];
+
+            // Get a reference to the result display area
+            const resultsContainer = document.getElementById('results');
+            resultsContainer.innerHTML = ''; // Clear previous results
+
+            try {
+                for (const order of orders) {
+                    const lastPrice = await fetchLastPrice( accessToken, order.symbol);
+
+                    // Place order only if last price matches the limit price
+                    if (lastPrice === order.limitPrice) {
+                        resultsContainer.innerHTML += `<p>Last price for ${order.symbol} matches limit price of ${order.limitPrice}. Placing order...</p>`;
+                        const orderResponse = await placeOrder(appId, accessToken, order);
+                        resultsContainer.innerHTML += `<p>Order placed for ${order.symbol}: ${JSON.stringify(orderResponse)}</p>`;
+                    } else {
+                        resultsContainer.innerHTML += `<p>Last price for ${order.symbol} (${lastPrice}) does not match limit price of ${order.limitPrice}. Order not placed.</p>`;
+                    }
+                }
+            } catch (error) {
+                resultsContainer.innerHTML += `<p style="color: red;">Error in processing orders: ${error.message}</p>`;
+            }
+        }
+
+        async function fetchLastPrice(accessToken, symbol) {
+            const response = await fetch(`https://api-t1.fyers.in/data/quotes?symbols=${symbol}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `${accessToken}`,
+                }
+            });
+
+            const data = await response.json();
+            if (data.s === 'ok') {
+                return data.d[0].v.lp; // Last price from the response
+            } else {
+                throw new Error(`Failed to fetch stock data for ${symbol}`);
+            }
+        }
+
+        async function placeOrder(appId, accessToken, order) {
+            const orderData = {
+                symbol: order.symbol,
+                qty: order.qty,
+                type: 1, // Market order type (1 for market, 2 for limit)
+                side: order.side, // 1 for buy, 2 for sell
+                productType: "INTRADAY",
+                limitPrice: order.limitPrice,
+                stopPrice: 0,
+                validity: "DAY",
+                disclosedQty: 0,
+                offlineOrder: false,
+                stopLoss: 0,
+                takeProfit: 0,
+                orderTag: "tag1"
+            };
+
+            const response = await fetch('https://api-t1.fyers.in/api/v3/orders/sync', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(orderData)
+            });
+
+            return await response.json();
+        }
+
+        // Trigger the process when "Run" button is clicked
+        function onRunButtonClick() {
+            const resultsContainer = document.getElementById('results');
+            resultsContainer.innerHTML = `<p>Fetching stock data and placing orders...</p>`;
+            fetchAndPlaceOrders();
+        }
+    </script>
+</head>
+<body>
+    <h1>Multiple Stock Orders</h1>
+    <button onclick="onRunButtonClick()">Run</button>
+    <p>Click the button to start fetching stock data and placing orders.</p>
+
+    <div id="results"></div> <!-- Results will be displayed here -->
+</body>
+</html>
